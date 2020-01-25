@@ -45,7 +45,7 @@ struct world
 
         return chunks_[width_ * y_chk + x_chk](x_rem, y_rem);
     }
-    state const& operator()(const std::size_t x, const std::size_t y) const noexcept
+    state operator()(const std::size_t x, const std::size_t y) const noexcept
     {
         constexpr std::size_t chunk_width  = chunk::width;
         constexpr std::size_t chunk_height = chunk::height;
