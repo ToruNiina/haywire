@@ -33,13 +33,29 @@ struct chunk
 
 struct world
 {
-    chunk& operator()(const std::size_t x, const std::size_t y) noexcept
+    state& operator()(const std::size_t x, const std::size_t y) noexcept
     {
-        return chunks_[width_ * y + x];
+        constexpr std::size_t chunk_width  = chunk::width;
+        constexpr std::size_t chunk_height = chunk::height;
+
+        const auto x_chk = x / chunk_width;
+        const auto x_rem = x % chunk_width;
+        const auto y_chk = y / chunk_height;
+        const auto y_rem = y % chunk_height;
+
+        return chunks_[width_ * y_chk + x_chk](x_rem, y_rem);
     }
-    chunk const& operator()(const std::size_t x, const std::size_t y) const noexcept
+    state const& operator()(const std::size_t x, const std::size_t y) const noexcept
     {
-        return chunks_[width_ * y + x];
+        constexpr std::size_t chunk_width  = chunk::width;
+        constexpr std::size_t chunk_height = chunk::height;
+
+        const auto x_chk = x / chunk_width;
+        const auto x_rem = x % chunk_width;
+        const auto y_chk = y / chunk_height;
+        const auto y_rem = y % chunk_height;
+
+        return chunks_[width_ * y_chk + x_chk](x_rem, y_rem);
     }
 
     std::size_t width()  const noexcept {return width_;}
