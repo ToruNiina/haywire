@@ -1,9 +1,10 @@
 #include <haywire/world.hpp>
+#include <haywire/gui.hpp>
 
 int main()
 {
-    haywire::world wld;
-
+    haywire::window win;
+    while(win.update()) {}
 
     return 0;
 }
