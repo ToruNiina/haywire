@@ -59,11 +59,17 @@ struct window
     window(): window(640, 480, 20) {}
 
     window(std::size_t w, std::size_t h, std::size_t c)
-    : origin_x_(0), origin_y_(0), cell_size_(c), world_(w/c, h/c), resource_(),
+    : origin_x_(0), origin_y_(0), window_width_(w), window_height_(h),
+      cell_size_(c), world_(w/c+1, h/c+1), resource_(),
       window_(SDL_CreateWindow("haywire", 0, 0, w, h, SDL_WINDOW_RESIZABLE),
               &SDL_DestroyWindow),
       renderer_(SDL_CreateRenderer(window_.get(), -1, 0), &SDL_DestroyRenderer)
-    {}
+    {
+        SDL_GetMouseState(&mouse_prev_x_, &mouse_prev_y_);
+
+        assert(origin_x_ + window_width_  < world_.width()  * cell_size_);
+        assert(origin_y_ + window_height_ < world_.height() * cell_size_);
+    }
     ~window() = default;
     window(const window&) = delete;
     window(window&&)      = default;
@@ -84,7 +90,6 @@ struct window
         {
             this->draw();
             if(not this->handle_event()){return false;}
-
         }
         return true;
     }
@@ -96,13 +101,13 @@ struct window
 
         int w, h;
         SDL_GetWindowSize(window_.get(), &w, &h);
-        const int window_width  = w;
-        const int window_height = h;
+        window_width_  = w;
+        window_height_ = h;
 
         const std::size_t cell_begin_x = origin_x_ / cell_size_;
         const std::size_t cell_begin_y = origin_y_ / cell_size_;
-        const std::size_t cell_end_x   = (origin_x_ + window_width)  / cell_size_;
-        const std::size_t cell_end_y   = (origin_y_ + window_height) / cell_size_;
+        const std::size_t cell_end_x   = (origin_x_ + window_width_)  / cell_size_;
+        const std::size_t cell_end_y   = (origin_y_ + window_height_) / cell_size_;
 
         const int border = (5 <= cell_size_) ? 1 : 0;
 
@@ -149,6 +154,11 @@ struct window
 
     bool handle_event()
     {
+        int w, h;
+        SDL_GetWindowSize(window_.get(), &w, &h);
+        window_width_  = w;
+        window_height_ = h;
+
         SDL_Event event;
         SDL_PollEvent(&event);
 
@@ -160,6 +170,15 @@ struct window
                 std::int32_t cell_size = this->cell_size_;
                 cell_size += event.wheel.y;
                 this->cell_size_ = std::max(1, cell_size);
+
+                while(world_.width() * cell_size_ < origin_x_ + window_width_)
+                {
+                    world_.expand_width(world::direction::plus);
+                }
+                while(world_.height() * cell_size_ < origin_y_ + window_height_)
+                {
+                    world_.expand_height(world::direction::plus);
+                }
                 break;
             }
             case SDL_MOUSEBUTTONDOWN:
@@ -182,13 +201,10 @@ struct window
                         case state::tail:   {world_(x, y) = state::vacuum; break;}
                     }
                 }
-                else
-                {
-                    this->origin_x_ += drag_x_;
-                    this->origin_y_ += drag_y_;
-                }
                 this->drag_x_ = 0;
                 this->drag_y_ = 0;
+                this->mouse_prev_x_ = event.button.x;
+                this->mouse_prev_y_ = event.button.y;
                 this->is_mouse_button_down_ = false;
                 this->is_mouse_dragging_    = false;
                 break;
@@ -197,18 +213,41 @@ struct window
             {
                 if(is_mouse_button_down_)
                 {
-                    drag_x_ += event.motion.xrel;
-                    drag_y_ += event.motion.yrel;
+                    this->drag_x_ -= event.motion.x - mouse_prev_x_;
+                    this->drag_y_ -= event.motion.y - mouse_prev_y_;
 
                     if(5 <= std::abs(drag_x_) || 5 <= std::abs(drag_y_))
                     {
                         this->is_mouse_dragging_ = true;
+
                         this->origin_x_ += drag_x_;
                         this->origin_y_ += drag_y_;
                         this->drag_x_ = 0;
                         this->drag_y_ = 0;
+
+                        while(origin_x_ < 0)
+                        {
+                            world_.expand_width(world::direction::minus);
+                            this->origin_x_ += chunk::width * cell_size_;
+                        }
+                        while(world_.width() * cell_size_ <= origin_x_ + window_width_)
+                        {
+                            world_.expand_width(world::direction::plus);
+                        }
+
+                        while(origin_y_ < 0)
+                        {
+                            world_.expand_height(world::direction::minus);
+                            this->origin_y_ += chunk::height * cell_size_;
+                        }
+                        while(world_.height() * cell_size_ <= origin_y_ + window_height_)
+                        {
+                            world_.expand_height(world::direction::plus);
+                        }
                     }
                 }
+                mouse_prev_x_ = event.motion.x;
+                mouse_prev_y_ = event.motion.y;
                 break;
             }
         }
@@ -217,10 +256,12 @@ struct window
 
   private:
 
-    bool is_mouse_button_down_;
-    bool is_mouse_dragging_;
-    std::int32_t drag_x_,   drag_y_;
+    bool is_mouse_button_down_ = false;
+    bool is_mouse_dragging_    = false;
+    std::int32_t drag_x_ = 0,   drag_y_ = 0;
+    std::int32_t mouse_prev_x_, mouse_prev_y_;
     std::int32_t origin_x_, origin_y_;
+    std::size_t  window_width_, window_height_;
     std::size_t            cell_size_;
     world                  world_;
     sdl_resource_type      resource_;
