@@ -51,7 +51,7 @@ struct world
         constexpr std::size_t chunk_width  = chunk::width;
         constexpr std::size_t chunk_height = chunk::height;
 
-        assert(0 <= x && x < width_ && 0 <= y && y <= height_);
+        assert(0 <= x && x < width_ && 0 <= y && y < height_);
 
         const auto x_chk = x / chunk_width;
         const auto x_rem = x % chunk_width;
