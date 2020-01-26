@@ -1,7 +1,9 @@
 #ifndef HAYWIRE_WORLD_HPP
 #define HAYWIRE_WORLD_HPP
 #include <array>
+#include <vector>
 #include <cstdint>
+#include <cassert>
 
 namespace haywire
 {
@@ -16,8 +18,8 @@ enum state : std::uint8_t
 
 struct chunk
 {
-    constexpr inline std::size_t width  = 8;
-    constexpr inline std::size_t height = 8;
+    static constexpr inline std::size_t width  = 8;
+    static constexpr inline std::size_t height = 8;
 
     std::array<state, width * height> cells;
 
@@ -28,11 +30,11 @@ struct chunk
     chunk& operator=(const chunk&) noexcept = default;
     chunk& operator=(chunk&&)      noexcept = default;
 
-    constexpr state& operator()(const std::size_t x, const std::size_t y)       noexcept
+    state& operator()(const std::size_t x, const std::size_t y)       noexcept
     {
         return cells[width * y + x];
     }
-    constexpr state  operator()(const std::size_t x, const std::size_t y) const noexcept
+    state  operator()(const std::size_t x, const std::size_t y) const noexcept
     {
         return cells[width * y + x];
     }
@@ -49,7 +51,7 @@ struct world
         constexpr std::size_t chunk_width  = chunk::width;
         constexpr std::size_t chunk_height = chunk::height;
 
-        if(x < 0 || width_ <= x || y < 0 || height_ <= y) {return state::vacuum;}
+        assert(0 <= x && x < width_ && 0 <= y && y <= height_);
 
         const auto x_chk = x / chunk_width;
         const auto x_rem = x % chunk_width;
@@ -58,7 +60,7 @@ struct world
 
         return chunks_[width_ * y_chk + x_chk](x_rem, y_rem);
     }
-    state operator()(const std::int32_t x, const std::int32_t y) noexcept
+    state operator()(const std::int32_t x, const std::int32_t y) const noexcept
     {
         constexpr std::size_t chunk_width  = chunk::width;
         constexpr std::size_t chunk_height = chunk::height;
@@ -101,21 +103,22 @@ struct world
         {
             for(std::uint32_t x = 0; x < this->width_; ++x)
             {
-                switch((*this)(x, y))
+                const auto& self = *this;// as_const
+                switch(self(x, y))
                 {
                     case state::vacuum: {continue;}
                     case state::wire:
                     {
                         const int count =
-                            static_cast<int>((*this)(x-1, y-1) == state::head) +
-                            static_cast<int>((*this)(x  , y-1) == state::head) +
-                            static_cast<int>((*this)(x+1, y-1) == state::head) +
-                            static_cast<int>((*this)(x-1, y  ) == state::head) +
-                            static_cast<int>((*this)(x  , y  ) == state::head) +
-                            static_cast<int>((*this)(x+1, y  ) == state::head) +
-                            static_cast<int>((*this)(x-1, y+1) == state::head) +
-                            static_cast<int>((*this)(x 1, y+1) == state::head) +
-                            static_cast<int>((*this)(x+1, y+1) == state::head);
+                            static_cast<int>(self(x-1, y-1) == state::head) +
+                            static_cast<int>(self(x  , y-1) == state::head) +
+                            static_cast<int>(self(x+1, y-1) == state::head) +
+                            static_cast<int>(self(x-1, y  ) == state::head) +
+                            static_cast<int>(self(x  , y  ) == state::head) +
+                            static_cast<int>(self(x+1, y  ) == state::head) +
+                            static_cast<int>(self(x-1, y+1) == state::head) +
+                            static_cast<int>(self(x  , y+1) == state::head) +
+                            static_cast<int>(self(x+1, y+1) == state::head);
                         if(count == 1 || count == 2)
                         {
                             (*this)(x, y) = state::head;
@@ -170,7 +173,7 @@ struct world
         chunks_buf_.resize(this->width_ * this->height_);
         return;
     }
-    void expand_height()
+    void expand_height(direction dir)
     {
         chunks_buf_.resize(chunks_.size() + this->height_);
 
@@ -210,6 +213,7 @@ struct world
     std::size_t width_, height_;
     std::vector<chunk>  chunks_;
     std::vector<chunk>  chunks_buf_;
+    state               outside_;
 };
 
 } // haywire
