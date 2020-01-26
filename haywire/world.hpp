@@ -44,7 +44,11 @@ struct world
 {
     enum class direction: std::uint8_t {plus, minus};
 
-    world(): width_(1), height_(1), chunks_(1), chunks_buf_(1) {}
+    world(std::size_t w, std::size_t h) : width_(w), height_(h),
+      width_chunk_(w / chunk::width + 1), height_chunk_(h / chunk::height + 1),
+      chunks_    ((w / chunk::width + 1) * (h / chunk::height + 1)),
+      chunks_buf_((w / chunk::width + 1) * (h / chunk::height + 1))
+    {}
 
     state& operator()(const std::int32_t x, const std::int32_t y) noexcept
     {
@@ -58,55 +62,72 @@ struct world
         const auto y_chk = y / chunk_height;
         const auto y_rem = y % chunk_height;
 
-        return chunks_[width_ * y_chk + x_chk](x_rem, y_rem);
+        return chunks_[width_chunk_ * y_chk + x_chk](x_rem, y_rem);
     }
     state operator()(const std::int32_t x, const std::int32_t y) const noexcept
     {
         constexpr std::size_t chunk_width  = chunk::width;
         constexpr std::size_t chunk_height = chunk::height;
 
-        if(x < 0 || width_ <= x || y < 0 || height_ <= y) {return state::vacuum;}
+        if(x < 0 || width_ <= x || y < 0 || height_ <= y)
+        {
+            return state::vacuum;
+        }
 
         const auto x_chk = x / chunk_width;
         const auto x_rem = x % chunk_width;
         const auto y_chk = y / chunk_height;
         const auto y_rem = y % chunk_height;
 
-        return chunks_[width_ * y_chk + x_chk](x_rem, y_rem);
+        return chunks_[width_chunk_ * y_chk + x_chk](x_rem, y_rem);
     }
 
     chunk& chunk_at(const std::uint32_t x, const std::uint32_t y,
                     const std::nothrow_t&) noexcept
     {
-        return chunks_[width_ * y + x];
+        return chunks_[width_chunk_ * y + x];
     }
     chunk const& chunk_at(const std::uint32_t x, const std::uint32_t y,
                           const std::nothrow_t&) const noexcept
     {
-        return chunks_[width_ * y + x];
+        return chunks_[width_chunk_ * y + x];
     }
 
     chunk& chunk_at(const std::uint32_t x, const std::uint32_t y)
     {
-        return chunks_.at(width_ * y + x);
+        return chunks_.at(width_chunk_ * y + x);
     }
     chunk const& chunk_at(const std::uint32_t x, const std::uint32_t y) const
     {
-        return chunks_.at(width_ * y + x);
+        return chunks_.at(width_chunk_ * y + x);
     }
 
     void update()
     {
-        this->chunks_buf_ = this->chunks_;
+        constexpr std::size_t chunk_width  = chunk::width;
+        constexpr std::size_t chunk_height = chunk::height;
+
+        chunks_buf_.resize(chunks_.size());
 
         for(std::uint32_t y = 0; y < this->height_; ++y)
         {
+            const auto y_chk = y / chunk_height;
+            const auto y_rem = y % chunk_height;
+
             for(std::uint32_t x = 0; x < this->width_; ++x)
             {
+                const auto x_chk = x / chunk_width;
+                const auto x_rem = x % chunk_width;
+
                 const auto& self = *this;// as_const
                 switch(self(x, y))
                 {
-                    case state::vacuum: {continue;}
+                    case state::vacuum:
+                    {
+                        chunks_buf_[width_chunk_ * y_chk + x_chk]
+                            (x_rem, y_rem) = state::vacuum;
+                        break;
+                    }
                     case state::wire:
                     {
                         const int count =
@@ -121,23 +142,32 @@ struct world
                             static_cast<int>(self(x+1, y+1) == state::head);
                         if(count == 1 || count == 2)
                         {
-                            (*this)(x, y) = state::head;
+                            chunks_buf_[width_chunk_ * y_chk + x_chk]
+                                (x_rem, y_rem) = state::head;
+                        }
+                        else
+                        {
+                            chunks_buf_[width_chunk_ * y_chk + x_chk]
+                                (x_rem, y_rem) = state::wire;
                         }
                         break;
                     }
                     case state::head:
                     {
-                        (*this)(x, y) = state::tail;
+                        chunks_buf_[width_chunk_ * y_chk + x_chk]
+                            (x_rem, y_rem) = state::tail;
                         break;
                     }
                     case state::tail:
                     {
-                        (*this)(x, y) = state::wire;
+                        chunks_buf_[width_chunk_ * y_chk + x_chk]
+                            (x_rem, y_rem) = state::wire;
                         break;
                     }
                 }
             }
         }
+        std::swap(chunks_buf_, chunks_);
         return;
     }
 
@@ -206,14 +236,13 @@ struct world
         return;
     }
 
-    std::size_t width()  const noexcept {return width_;}
-    std::size_t height() const noexcept {return height_;}
+    std::size_t width()  const noexcept {return width_ * chunk::width;}
+    std::size_t height() const noexcept {return height_ * chunk::height;}
 
   private:
-    std::size_t width_, height_;
+    std::size_t width_, height_, width_chunk_, height_chunk_;
     std::vector<chunk>  chunks_;
     std::vector<chunk>  chunks_buf_;
-    state               outside_;
 };
 
 } // haywire
