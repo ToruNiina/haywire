@@ -2,11 +2,50 @@
 #define HAYWIRE_GUI_HPP
 #include "world.hpp"
 #include <SDL2/SDL.h>
+#include <stdexcept>
+#include <string>
 #include <memory>
 #include <chrono>
 
 namespace haywire
 {
+
+struct sdl_resource
+{
+    sdl_resource(): should_quit_(true)
+    {
+        if(SDL_Init(SDL_INIT_EVERYTHING) != 0)
+        {
+            using std::literals::string_literals::operator""s;
+            throw std::runtime_error("Error while initializing SDL"s +
+                                     SDL_GetError());
+        }
+    }
+    ~sdl_resource()
+    {
+        if(should_quit_)
+        {
+            SDL_Quit();
+        }
+    }
+
+    sdl_resource(const sdl_resource&) = delete;
+    sdl_resource& operator=(const sdl_resource&) = delete;
+
+    sdl_resource(sdl_resource&& other): should_quit_(true)
+    {
+        other.should_quit_ = false;
+    }
+    sdl_resource& operator=(sdl_resource&& other)
+    {
+        this->should_quit_ = true;
+        other.should_quit_ = false;
+        return *this;
+    }
+
+  private:
+    bool should_quit_;
+};
 
 struct window
 {
@@ -14,9 +53,10 @@ struct window
         std::unique_ptr<SDL_Window,   decltype(&SDL_DestroyWindow)>;
     using renderer_resource_type =
         std::unique_ptr<SDL_Renderer, decltype(&SDL_DestroyRenderer)>;
+    using sdl_resource_type = sdl_resource;
 
     window()
-    : origin_x_(0), origin_y_(0), cell_size_(4), world_(),
+    : origin_x_(0), origin_y_(0), cell_size_(4), world_(), resource_(),
       window_(SDL_CreateWindow("haywire", 0, 0, 640, 480, SDL_WINDOW_RESIZABLE),
               &SDL_DestroyWindow),
       renderer_(SDL_CreateRenderer(window_.get(), -1, 0), &SDL_DestroyRenderer)
@@ -111,6 +151,7 @@ struct window
     std::size_t            origin_x_, origin_y_;
     std::size_t            cell_size_;
     world                  world_;
+    sdl_resource_type      resource_;
     window_resource_type   window_;
     renderer_resource_type renderer_;
 };
