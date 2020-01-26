@@ -173,71 +173,76 @@ struct world
 
     void expand_width(direction dir)
     {
-        chunks_buf_.resize(chunks_.size() + this->width_);
+        chunks_buf_.resize(chunks_.size() + this->height_chunk_);
+        std::fill(chunks_buf_.begin(), chunks_buf_.end(), chunk{});
 
         if(dir == direction::plus)
         {
-            for(std::uint32_t y = 0; y < this->height_; ++y)
+            for(std::uint32_t y = 0; y < this->height_chunk_; ++y)
             {
-                for(std::uint32_t x = 0; x < this->width_; ++x)
+                for(std::uint32_t x = 0; x < this->width_chunk_; ++x)
                 {
-                    chunks_buf_.at(this->width_ * y + x) =
-                        chunks_.at(this->width_ * y + x);
+                    chunks_buf_.at((this->width_chunk_ + 1) * y + x) =
+                        chunks_.at( this->width_chunk_      * y + x);
                 }
             }
         }
         else
         {
-            for(std::uint32_t y = 0; y < this->height_; ++y)
+            for(std::uint32_t y = 0; y < this->height_chunk_; ++y)
             {
-                for(std::uint32_t x = 0; x < this->width_; ++x)
+                for(std::uint32_t x = 0; x < this->width_chunk_; ++x)
                 {
                     // chunks are expanded to the minus direction
-                    chunks_buf_.at(this->width_ * y + x + 1) =
-                        chunks_.at(this->width_ * y + x);
+                    chunks_buf_.at((this->width_chunk_ + 1) * y + x + 1) =
+                        chunks_.at( this->width_chunk_      * y + x);
                 }
             }
         }
-        std::swap(chunks_buf_, chunks_);
-        this->width_ += 1;
-        chunks_buf_.resize(this->width_ * this->height_);
+        chunks_ = chunks_buf_;
+        this->width_chunk_ += 1;
+        this->width_        = chunk::width * width_chunk_;
+        assert(chunks_.size() == this->width_chunk_ * this->height_chunk_);
         return;
     }
     void expand_height(direction dir)
     {
-        chunks_buf_.resize(chunks_.size() + this->height_);
+        chunks_buf_.resize(chunks_.size() + this->width_chunk_);
+        std::fill(chunks_buf_.begin(), chunks_buf_.end(), chunk{});
 
         if(dir == direction::plus)
         {
-            for(std::uint32_t y = 0; y < this->height_; ++y)
+            for(std::uint32_t y = 0; y < this->height_chunk_; ++y)
             {
-                for(std::uint32_t x = 0; x < this->width_; ++x)
+                for(std::uint32_t x = 0; x < this->width_chunk_; ++x)
                 {
-                    chunks_buf_.at(this->width_ * y + x) =
-                        chunks_.at(this->width_ * y + x);
+                    chunks_buf_.at(this->width_chunk_ * y + x) =
+                        chunks_.at(this->width_chunk_ * y + x);
                 }
             }
         }
         else
         {
-            for(std::uint32_t y = 0; y < this->height_; ++y)
+            for(std::uint32_t y = 0; y < this->height_chunk_; ++y)
             {
-                for(std::uint32_t x = 0; x < this->width_; ++x)
+                for(std::uint32_t x = 0; x < this->width_chunk_; ++x)
                 {
                     // chunks are expanded to the minus direction
-                    chunks_buf_.at(this->width_ * (y+1) + x) =
-                        chunks_.at(this->width_ * y + x);
+                    chunks_buf_.at(this->width_chunk_ * (y+1) + x) =
+                        chunks_.at(this->width_chunk_ *  y    + x);
                 }
             }
         }
-        std::swap(chunks_buf_, chunks_);
-        this->height_ += 1;
-        chunks_buf_.resize(this->width_ * this->height_);
+        chunks_ = chunks_buf_;
+        this->height_chunk_ += 1;
+        this->height_        = chunk::height * height_chunk_;
+
+        assert(chunks_.size() == this->width_chunk_ * this->height_chunk_);
         return;
     }
 
-    std::size_t width()  const noexcept {return width_ * chunk::width;}
-    std::size_t height() const noexcept {return height_ * chunk::height;}
+    std::size_t width()  const noexcept {return width_ ;}
+    std::size_t height() const noexcept {return height_;}
 
   private:
     std::size_t width_, height_, width_chunk_, height_chunk_;
