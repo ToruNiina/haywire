@@ -81,9 +81,12 @@ struct window
         const auto fps60 = std::chrono::system_clock::now() +
                            std::chrono::milliseconds(16);
 
-        this->world_.update();
-        this->draw();
+        if(this->is_running_)
+        {
+            this->world_.update();
+        }
 
+        this->draw();
         if(not this->handle_event()){return false;}
 
         while(std::chrono::system_clock::now() < fps60)
@@ -250,6 +253,28 @@ struct window
                 mouse_prev_y_ = event.motion.y;
                 break;
             }
+            case SDL_KEYUP:
+            {
+                switch(event.key.keysym.scancode)
+                {
+                    case SDL_SCANCODE_SPACE:
+                    {
+                        is_running_ = not is_running_;
+                        break;
+                    }
+                    case SDL_SCANCODE_RETURN:
+                    {
+                        if(not is_running_)
+                        {
+                            world_.update();
+                            this->draw();
+                        }
+                        break;
+                    }
+                    default: {break;}
+                }
+                break;
+            }
         }
         return true;
     }
@@ -258,6 +283,7 @@ struct window
 
     bool is_mouse_button_down_ = false;
     bool is_mouse_dragging_    = false;
+    bool is_running_           = true;
     std::int32_t drag_x_ = 0,   drag_y_ = 0;
     std::int32_t mouse_prev_x_, mouse_prev_y_;
     std::int32_t origin_x_, origin_y_;
