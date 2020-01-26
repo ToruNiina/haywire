@@ -182,6 +182,13 @@ struct window
                         case state::tail:   {world_(x, y) = state::vacuum; break;}
                     }
                 }
+                else
+                {
+                    this->origin_x_ += drag_x_;
+                    this->origin_y_ += drag_y_;
+                }
+                this->drag_x_ = 0;
+                this->drag_y_ = 0;
                 this->is_mouse_button_down_ = false;
                 this->is_mouse_dragging_    = false;
                 break;
@@ -190,7 +197,17 @@ struct window
             {
                 if(is_mouse_button_down_)
                 {
-                    this->is_mouse_dragging_ = true;
+                    drag_x_ += event.motion.xrel;
+                    drag_y_ += event.motion.yrel;
+
+                    if(5 <= std::abs(drag_x_) || 5 <= std::abs(drag_y_))
+                    {
+                        this->is_mouse_dragging_ = true;
+                        this->origin_x_ += drag_x_;
+                        this->origin_y_ += drag_y_;
+                        this->drag_x_ = 0;
+                        this->drag_y_ = 0;
+                    }
                 }
                 break;
             }
@@ -202,7 +219,8 @@ struct window
 
     bool is_mouse_button_down_;
     bool is_mouse_dragging_;
-    std::size_t            origin_x_, origin_y_;
+    std::int32_t drag_x_,   drag_y_;
+    std::int32_t origin_x_, origin_y_;
     std::size_t            cell_size_;
     world                  world_;
     sdl_resource_type      resource_;
