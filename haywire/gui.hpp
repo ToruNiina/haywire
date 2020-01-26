@@ -1,7 +1,7 @@
 #ifndef HAYWIRE_GUI_HPP
 #define HAYWIRE_GUI_HPP
 #include "world.hpp"
-#include <SDL2/SDL.h>
+#include <SDL.h>
 #include <stdexcept>
 #include <string>
 #include <memory>
