@@ -6,6 +6,7 @@
 #include <string>
 #include <memory>
 #include <chrono>
+#include <iostream>
 
 namespace haywire
 {
@@ -55,9 +56,11 @@ struct window
         std::unique_ptr<SDL_Renderer, decltype(&SDL_DestroyRenderer)>;
     using sdl_resource_type = sdl_resource;
 
-    window()
-    : origin_x_(0), origin_y_(0), cell_size_(4), world_(), resource_(),
-      window_(SDL_CreateWindow("haywire", 0, 0, 640, 480, SDL_WINDOW_RESIZABLE),
+    window(): window(640, 480, 20) {}
+
+    window(std::size_t w, std::size_t h, std::size_t c)
+    : origin_x_(0), origin_y_(0), cell_size_(c), world_(w/c, h/c), resource_(),
+      window_(SDL_CreateWindow("haywire", 0, 0, w, h, SDL_WINDOW_RESIZABLE),
               &SDL_DestroyWindow),
       renderer_(SDL_CreateRenderer(window_.get(), -1, 0), &SDL_DestroyRenderer)
     {}
@@ -70,16 +73,20 @@ struct window
     bool update()
     {
         const auto fps60 = std::chrono::system_clock::now() +
-                           std::chrono::milliseconds(17);
+                           std::chrono::milliseconds(16);
 
         this->world_.update();
         this->draw();
 
-        const bool continues = this->handle_event();
+        if(not this->handle_event()){return false;}
 
-        while(std::chrono::system_clock::now() < fps60) {}
+        while(std::chrono::system_clock::now() < fps60)
+        {
+            this->draw();
+            if(not this->handle_event()){return false;}
 
-        return continues;
+        }
+        return true;
     }
 
     void draw()
@@ -97,10 +104,18 @@ struct window
         const std::size_t cell_end_x   = (origin_x_ + window_width)  / cell_size_;
         const std::size_t cell_end_y   = (origin_y_ + window_height) / cell_size_;
 
+        const int border = (5 <= cell_size_) ? 1 : 0;
+
+        SDL_Rect rect;
+        rect.w = cell_size_- 2 * border;
+        rect.h = cell_size_- 2 * border;
         for(std::size_t y = cell_begin_y; y < cell_end_y; ++y)
         {
             for(std::size_t x = cell_begin_x; x < cell_end_x; ++x)
             {
+                const auto cell_x = x * cell_size_ - origin_x_;
+                const auto cell_y = y * cell_size_ - origin_y_;
+
                 switch(std::as_const(world_)(x, y))
                 {
                     case state::vacuum:
@@ -109,25 +124,23 @@ struct window
                     }
                     case state::wire:
                     {
-                        SDL_SetRenderDrawColor(renderer_.get(), 0xFF, 0xFF, 0, 0xFF);
+                        SDL_SetRenderDrawColor(renderer_.get(), 0xFF, 0xFF, 0x00, 0xFF);
                         break;
                     }
                     case state::head:
                     {
-                        SDL_SetRenderDrawColor(renderer_.get(), 0xFF, 0x00, 0, 0xFF);
+                        SDL_SetRenderDrawColor(renderer_.get(), 0xFF, 0x00, 0x00, 0xFF);
+                        break;
                     }
                     case state::tail:
                     {
-                        SDL_SetRenderDrawColor(renderer_.get(), 0, 0, 0xFF, 0xFF);
+                        SDL_SetRenderDrawColor(renderer_.get(), 0x00, 0x00, 0xFF, 0xFF);
                         break;
                     }
                 }
-                SDL_Rect rect;
-                rect.x = x * cell_size_ - origin_x_;
-                rect.y = y * cell_size_ - origin_y_;
-                rect.w = cell_size_;
-                rect.h = cell_size_;
-                SDL_RenderDrawRect(renderer_.get(), &rect);
+                rect.x = cell_x + border;
+                rect.y = cell_y + border;
+                SDL_RenderFillRect(renderer_.get(), &rect);
             }
         }
         SDL_RenderPresent(renderer_.get());
@@ -142,12 +155,53 @@ struct window
         switch(event.type)
         {
             case SDL_QUIT: {return false;}
+            case SDL_MOUSEWHEEL:
+            {
+                std::int32_t cell_size = this->cell_size_;
+                cell_size += event.wheel.y;
+                this->cell_size_ = std::max(1, cell_size);
+                break;
+            }
+            case SDL_MOUSEBUTTONDOWN:
+            {
+                this->is_mouse_button_down_ = true;
+                break;
+            }
+            case SDL_MOUSEBUTTONUP:
+            {
+                if(not is_mouse_dragging_)
+                {
+                    const std::int32_t x = (event.button.x + origin_x_) / cell_size_;
+                    const std::int32_t y = (event.button.y + origin_y_) / cell_size_;
+
+                    switch(std::as_const(world_)(x, y))
+                    {
+                        case state::vacuum: {world_(x, y) = state::wire;   break;}
+                        case state::wire:   {world_(x, y) = state::head;   break;}
+                        case state::head:   {world_(x, y) = state::tail;   break;}
+                        case state::tail:   {world_(x, y) = state::vacuum; break;}
+                    }
+                }
+                this->is_mouse_button_down_ = false;
+                this->is_mouse_dragging_    = false;
+                break;
+            }
+            case SDL_MOUSEMOTION:
+            {
+                if(is_mouse_button_down_)
+                {
+                    this->is_mouse_dragging_ = true;
+                }
+                break;
+            }
         }
         return true;
     }
 
   private:
 
+    bool is_mouse_button_down_;
+    bool is_mouse_dragging_;
     std::size_t            origin_x_, origin_y_;
     std::size_t            cell_size_;
     world                  world_;
