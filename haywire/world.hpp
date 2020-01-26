@@ -21,6 +21,13 @@ struct chunk
 
     std::array<state, width * height> cells;
 
+    chunk() noexcept {cells.fill(state::vacuum);}
+    ~chunk() noexcept = default;
+    chunk(const chunk&) noexcept = default;
+    chunk(chunk&&)      noexcept = default;
+    chunk& operator=(const chunk&) noexcept = default;
+    chunk& operator=(chunk&&)      noexcept = default;
+
     constexpr state& operator()(const std::size_t x, const std::size_t y)       noexcept
     {
         return cells[width * y + x];
@@ -33,10 +40,16 @@ struct chunk
 
 struct world
 {
-    state& operator()(const std::size_t x, const std::size_t y) noexcept
+    enum class direction: std::uint8_t {plus, minus};
+
+    world(): width_(1), height_(1), chunks_(1), chunks_buf_(1) {}
+
+    state& operator()(const std::int32_t x, const std::int32_t y) noexcept
     {
         constexpr std::size_t chunk_width  = chunk::width;
         constexpr std::size_t chunk_height = chunk::height;
+
+        if(x < 0 || width_ <= x || y < 0 || height_ <= y) {return state::vacuum;}
 
         const auto x_chk = x / chunk_width;
         const auto x_rem = x % chunk_width;
@@ -45,10 +58,12 @@ struct world
 
         return chunks_[width_ * y_chk + x_chk](x_rem, y_rem);
     }
-    state operator()(const std::size_t x, const std::size_t y) const noexcept
+    state operator()(const std::int32_t x, const std::int32_t y) noexcept
     {
         constexpr std::size_t chunk_width  = chunk::width;
         constexpr std::size_t chunk_height = chunk::height;
+
+        if(x < 0 || width_ <= x || y < 0 || height_ <= y) {return state::vacuum;}
 
         const auto x_chk = x / chunk_width;
         const auto x_rem = x % chunk_width;
@@ -56,6 +71,136 @@ struct world
         const auto y_rem = y % chunk_height;
 
         return chunks_[width_ * y_chk + x_chk](x_rem, y_rem);
+    }
+
+    chunk& chunk_at(const std::uint32_t x, const std::uint32_t y,
+                    const std::nothrow_t&) noexcept
+    {
+        return chunks_[width_ * y + x];
+    }
+    chunk const& chunk_at(const std::uint32_t x, const std::uint32_t y,
+                          const std::nothrow_t&) const noexcept
+    {
+        return chunks_[width_ * y + x];
+    }
+
+    chunk& chunk_at(const std::uint32_t x, const std::uint32_t y)
+    {
+        return chunks_.at(width_ * y + x);
+    }
+    chunk const& chunk_at(const std::uint32_t x, const std::uint32_t y) const
+    {
+        return chunks_.at(width_ * y + x);
+    }
+
+    void update()
+    {
+        this->chunks_buf_ = this->chunks_;
+
+        for(std::uint32_t y = 0; y < this->height_; ++y)
+        {
+            for(std::uint32_t x = 0; x < this->width_; ++x)
+            {
+                switch((*this)(x, y))
+                {
+                    case state::vacuum: {continue;}
+                    case state::wire:
+                    {
+                        const int count =
+                            static_cast<int>((*this)(x-1, y-1) == state::head) +
+                            static_cast<int>((*this)(x  , y-1) == state::head) +
+                            static_cast<int>((*this)(x+1, y-1) == state::head) +
+                            static_cast<int>((*this)(x-1, y  ) == state::head) +
+                            static_cast<int>((*this)(x  , y  ) == state::head) +
+                            static_cast<int>((*this)(x+1, y  ) == state::head) +
+                            static_cast<int>((*this)(x-1, y+1) == state::head) +
+                            static_cast<int>((*this)(x 1, y+1) == state::head) +
+                            static_cast<int>((*this)(x+1, y+1) == state::head);
+                        if(count == 1 || count == 2)
+                        {
+                            (*this)(x, y) = state::head;
+                        }
+                        break;
+                    }
+                    case state::head:
+                    {
+                        (*this)(x, y) = state::tail;
+                        break;
+                    }
+                    case state::tail:
+                    {
+                        (*this)(x, y) = state::wire;
+                        break;
+                    }
+                }
+            }
+        }
+        return;
+    }
+
+    void expand_width(direction dir)
+    {
+        chunks_buf_.resize(chunks_.size() + this->width_);
+
+        if(dir == direction::plus)
+        {
+            for(std::uint32_t y = 0; y < this->height_; ++y)
+            {
+                for(std::uint32_t x = 0; x < this->width_; ++x)
+                {
+                    chunks_buf_.at(this->width_ * y + x) =
+                        chunks_.at(this->width_ * y + x);
+                }
+            }
+        }
+        else
+        {
+            for(std::uint32_t y = 0; y < this->height_; ++y)
+            {
+                for(std::uint32_t x = 0; x < this->width_; ++x)
+                {
+                    // chunks are expanded to the minus direction
+                    chunks_buf_.at(this->width_ * y + x + 1) =
+                        chunks_.at(this->width_ * y + x);
+                }
+            }
+        }
+        std::swap(chunks_buf_, chunks_);
+        this->width_ += 1;
+        chunks_buf_.resize(this->width_ * this->height_);
+        return;
+    }
+    void expand_height()
+    {
+        chunks_buf_.resize(chunks_.size() + this->height_);
+
+        if(dir == direction::plus)
+        {
+            for(std::uint32_t y = 0; y < this->height_; ++y)
+            {
+                for(std::uint32_t x = 0; x < this->width_; ++x)
+                {
+                    chunks_buf_.at(this->width_ * y + x) =
+                        chunks_.at(this->width_ * y + x);
+                }
+            }
+        }
+        else
+        {
+            for(std::uint32_t y = 0; y < this->height_; ++y)
+            {
+                for(std::uint32_t x = 0; x < this->width_; ++x)
+                {
+                    // chunks are expanded to the minus direction
+                    chunks_buf_.at(this->width_ * (y+1) + x) =
+                        chunks_.at(this->width_ * y + x);
+                }
+            }
+        }
+        std::swap(chunks_buf_, chunks_);
+        this->height_ += 1;
+        chunks_buf_.resize(this->width_ * this->height_);
+        return;
     }
 
     std::size_t width()  const noexcept {return width_;}
@@ -64,6 +209,7 @@ struct world
   private:
     std::size_t width_, height_;
     std::vector<chunk>  chunks_;
+    std::vector<chunk>  chunks_buf_;
 };
 
 } // haywire
