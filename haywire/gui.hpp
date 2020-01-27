@@ -59,16 +59,15 @@ struct window
     window(): window(640, 480, 20) {}
 
     window(std::size_t w, std::size_t h, std::size_t c)
-    : origin_x_(0), origin_y_(0), window_width_(w), window_height_(h),
-      cell_size_(c), world_(w/c+1, h/c+1), resource_(),
+    : origin_x_(0), origin_y_(0), cell_size_(c), world_(w/c+1, h/c+1), resource_(),
       window_(SDL_CreateWindow("haywire", 0, 0, w, h, SDL_WINDOW_RESIZABLE),
               &SDL_DestroyWindow),
       renderer_(SDL_CreateRenderer(window_.get(), -1, 0), &SDL_DestroyRenderer)
     {
         SDL_GetMouseState(&mouse_prev_x_, &mouse_prev_y_);
 
-        assert(origin_x_ + window_width_  < world_.width()  * cell_size_);
-        assert(origin_y_ + window_height_ < world_.height() * cell_size_);
+        assert(origin_x_ + w < world_.width()  * cell_size_);
+        assert(origin_y_ + h < world_.height() * cell_size_);
     }
     ~window() = default;
     window(const window&) = delete;
@@ -102,15 +101,13 @@ struct window
         SDL_SetRenderDrawColor(renderer_.get(), 0,0,0,0xFF);
         SDL_RenderClear(renderer_.get());
 
-        int w, h;
-        SDL_GetWindowSize(window_.get(), &w, &h);
-        window_width_  = w;
-        window_height_ = h;
+        int window_width, window_height;
+        SDL_GetWindowSize(window_.get(), &window_width, &window_height);
 
         const std::size_t cell_begin_x = origin_x_ / cell_size_;
         const std::size_t cell_begin_y = origin_y_ / cell_size_;
-        const std::size_t cell_end_x   = (origin_x_ + window_width_)  / cell_size_;
-        const std::size_t cell_end_y   = (origin_y_ + window_height_) / cell_size_;
+        const std::size_t cell_end_x   = (origin_x_ + window_width)  / cell_size_;
+        const std::size_t cell_end_y   = (origin_y_ + window_height) / cell_size_;
 
         const int border = (5 <= cell_size_) ? 1 : 0;
 
@@ -157,31 +154,31 @@ struct window
 
     bool handle_event()
     {
-        int w, h;
-        SDL_GetWindowSize(window_.get(), &w, &h);
-        window_width_  = w;
-        window_height_ = h;
-
         SDL_Event event;
         SDL_PollEvent(&event);
 
         switch(event.type)
         {
             case SDL_QUIT: {return false;}
+            case SDL_WINDOWEVENT:
+            {
+                switch(event.window.event)
+                {
+                    case SDL_WINDOWEVENT_RESIZED:
+                    {
+                        this->expand_world();
+                        break;
+                    }
+                    default: {break;}
+                }
+                break;
+            }
             case SDL_MOUSEWHEEL:
             {
                 std::int32_t cell_size = this->cell_size_;
                 cell_size += event.wheel.y;
                 this->cell_size_ = std::max(1, cell_size);
-
-                while(world_.width() * cell_size_ < origin_x_ + window_width_)
-                {
-                    world_.expand_width(world::direction::plus);
-                }
-                while(world_.height() * cell_size_ < origin_y_ + window_height_)
-                {
-                    world_.expand_height(world::direction::plus);
-                }
+                this->expand_world();
                 break;
             }
             case SDL_MOUSEBUTTONDOWN:
@@ -228,25 +225,7 @@ struct window
                         this->drag_x_ = 0;
                         this->drag_y_ = 0;
 
-                        while(origin_x_ < 0)
-                        {
-                            world_.expand_width(world::direction::minus);
-                            this->origin_x_ += chunk::width * cell_size_;
-                        }
-                        while(world_.width() * cell_size_ <= origin_x_ + window_width_)
-                        {
-                            world_.expand_width(world::direction::plus);
-                        }
-
-                        while(origin_y_ < 0)
-                        {
-                            world_.expand_height(world::direction::minus);
-                            this->origin_y_ += chunk::height * cell_size_;
-                        }
-                        while(world_.height() * cell_size_ <= origin_y_ + window_height_)
-                        {
-                            world_.expand_height(world::direction::plus);
-                        }
+                        this->expand_world();
                     }
                 }
                 mouse_prev_x_ = event.motion.x;
@@ -281,13 +260,40 @@ struct window
 
   private:
 
+    void expand_world()
+    {
+        int window_width, window_height;
+        SDL_GetWindowSize(window_.get(), &window_width, &window_height);
+
+        while(origin_x_ < 0)
+        {
+            world_.expand_width(world::direction::minus);
+            this->origin_x_ += chunk::width * cell_size_;
+        }
+        while(world_.width() * cell_size_ <= origin_x_ + window_width)
+        {
+            world_.expand_width(world::direction::plus);
+        }
+        while(origin_y_ < 0)
+        {
+            world_.expand_height(world::direction::minus);
+            this->origin_y_ += chunk::height * cell_size_;
+        }
+        while(world_.height() * cell_size_ <= origin_y_ + window_height)
+        {
+            world_.expand_height(world::direction::plus);
+        }
+        return;
+    }
+
+  private:
+
     bool is_mouse_button_down_ = false;
     bool is_mouse_dragging_    = false;
     bool is_running_           = true;
     std::int32_t drag_x_ = 0,   drag_y_ = 0;
     std::int32_t mouse_prev_x_, mouse_prev_y_;
     std::int32_t origin_x_, origin_y_;
-    std::size_t  window_width_, window_height_;
     std::size_t            cell_size_;
     world                  world_;
     sdl_resource_type      resource_;
