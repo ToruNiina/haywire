@@ -101,8 +101,7 @@ struct window
         SDL_SetRenderDrawColor(renderer_.get(), 0,0,0,0xFF);
         SDL_RenderClear(renderer_.get());
 
-        int window_width, window_height;
-        SDL_GetWindowSize(window_.get(), &window_width, &window_height);
+        const auto [window_width, window_height] = this->window_size();
 
         const std::size_t cell_begin_x = origin_x_ / cell_size_;
         const std::size_t cell_begin_y = origin_y_ / cell_size_;
@@ -262,8 +261,7 @@ struct window
 
     void expand_world()
     {
-        int window_width, window_height;
-        SDL_GetWindowSize(window_.get(), &window_width, &window_height);
+        const auto [window_width, window_height] = this->window_size();
 
         while(origin_x_ < 0)
         {
@@ -284,6 +282,13 @@ struct window
             world_.expand_height(world::direction::plus);
         }
         return;
+    }
+
+    std::pair<int, int> window_size()
+    {
+        int width, height;
+        SDL_GetWindowSize(window_.get(), &width, &height);
+        return std::make_pair(width, height);
     }
 
   private:
