@@ -1,5 +1,7 @@
 #ifndef HAYWIRE_WORLD_HPP
 #define HAYWIRE_WORLD_HPP
+#include <extlib/toml11/toml.hpp>
+#include <algorithm>
 #include <array>
 #include <vector>
 #include <cstdint>
@@ -16,6 +18,8 @@ enum state : std::uint8_t
     tail   = 3u,
 };
 
+
+
 struct chunk
 {
     static constexpr inline std::size_t width  = 8;
@@ -29,6 +33,25 @@ struct chunk
     chunk(chunk&&)      noexcept = default;
     chunk& operator=(const chunk&) noexcept = default;
     chunk& operator=(chunk&&)      noexcept = default;
+
+    toml::array into_toml() const
+    {
+        toml::array retval(width * height);
+        std::transform(cells.begin(), cells.end(), retval.begin(),
+            [](const state& s) noexcept -> toml::value {
+                return toml::integer(static_cast<std::uint8_t>(s));
+            });
+        return retval;
+    }
+    void from_toml(const toml::value& v)
+    {
+        const auto tmp = toml::get<std::array<std::uint8_t, width * height>>(v);
+        std::transform(tmp.begin(), tmp.end(), cells.begin(),
+                [](const std::uint8_t x) noexcept -> state {
+                    return static_cast<state>(x);
+                });
+        return;
+    }
 
     state& operator()(const std::size_t x, const std::size_t y)       noexcept
     {
@@ -44,11 +67,30 @@ struct world
 {
     enum class direction: std::uint8_t {plus, minus};
 
-    world(std::size_t w, std::size_t h) : width_(w), height_(h),
-      width_chunk_(w / chunk::width + 1), height_chunk_(h / chunk::height + 1),
-      chunks_    ((w / chunk::width + 1) * (h / chunk::height + 1)),
-      chunks_buf_((w / chunk::width + 1) * (h / chunk::height + 1))
-    {}
+    world(std::size_t w, std::size_t h)
+        : width_ ((w / chunk::width  + (w % chunk::width  != 0)) * chunk::width),
+          height_((h / chunk::height + (h % chunk::height != 0)) * chunk::height),
+          width_chunk_ (w / chunk::width  + (w % chunk::width  != 0)),
+          height_chunk_(h / chunk::height + (h % chunk::height != 0)),
+          chunks_    (width_chunk_ * height_chunk_),
+          chunks_buf_(width_chunk_ * height_chunk_)
+    {
+        assert(width_chunk_  * chunk::width  == width_);
+        assert(height_chunk_ * chunk::height == height_);
+    }
+
+    world(const toml::value& v)
+        : width_ (toml::find<std::size_t>(v, "width")),
+          height_(toml::find<std::size_t>(v, "height")),
+          width_chunk_ (width_  / chunk::width  + (width_  % chunk::width  != 0)),
+          height_chunk_(height_ / chunk::height + (height_ % chunk::height != 0)),
+          chunks_    (toml::find<std::vector<chunk>>(v, "chunks")),
+          chunks_buf_(chunks_)
+    {
+        assert(chunks_.size() == width_chunk_ * height_chunk_);
+        assert(width_chunk_  * chunk::width  == width_);
+        assert(height_chunk_ * chunk::height == height_);
+    }
 
     state& operator()(const std::int32_t x, const std::int32_t y) noexcept
     {
