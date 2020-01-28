@@ -262,7 +262,7 @@ struct window
                     case SDL_SCANCODE_S:
                     {
                         if(event.key.keysym.mod == KMOD_CTRL ||
-                           event.key.keysym.mod == 1024)
+                           event.key.keysym.mod == 1024) // Mac command-key
                         {
                             std::ofstream out("haywire.toml");
                             out << std::setw(160) << world_.into_toml();
