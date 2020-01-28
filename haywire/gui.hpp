@@ -249,6 +249,17 @@ struct window
                         }
                         break;
                     }
+                    case SDL_SCANCODE_S:
+                    {
+                        if(event.key.keysym.mod == KMOD_CTRL ||
+                           event.key.keysym.mod == 1024)
+                        {
+                            std::ofstream out("haywire.toml");
+                            out << std::setw(160) << world_.into_toml();
+                            std::cerr << "status written into haywire.toml" << std::endl;
+                        }
+                        break;
+                    }
                     default: {break;}
                 }
                 break;

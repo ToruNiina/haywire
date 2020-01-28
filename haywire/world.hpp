@@ -92,6 +92,16 @@ struct world
         assert(height_chunk_ * chunk::height == height_);
     }
 
+    toml::value into_toml() const
+    {
+        toml::array tmp(chunks_.size());
+        std::transform(chunks_.begin(), chunks_.end(), tmp.begin(),
+            [](const auto& ch) -> toml::value {return ch.into_toml();});
+        return toml::value{
+            {"width", width_}, {"height", height_}, {"chunks", std::move(tmp)}
+        };
+    }
+
     state& operator()(const std::int32_t x, const std::int32_t y) noexcept
     {
         constexpr std::size_t chunk_width  = chunk::width;
