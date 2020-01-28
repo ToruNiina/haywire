@@ -176,6 +176,16 @@ struct window
             {
                 std::int32_t cell_size = this->cell_size_;
                 cell_size += event.wheel.y;
+
+                const auto [window_width, window_height] = this->window_size();
+                const double ratio = std::max<double>(1, cell_size) / this->cell_size_;
+
+                const auto center_x = this->origin_x_ + window_width  / 2;
+                const auto center_y = this->origin_y_ + window_height / 2;
+
+                this->origin_x_ = center_x * ratio - window_width  / 2;
+                this->origin_y_ = center_y * ratio - window_height / 2;
+
                 this->cell_size_ = std::max(1, cell_size);
                 this->expand_world();
                 break;
