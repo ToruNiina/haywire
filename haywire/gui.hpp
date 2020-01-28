@@ -268,6 +268,12 @@ struct window
         return true;
     }
 
+    void load_toml(const std::string& fname)
+    {
+        this->world_ = world(toml::parse(fname));
+        return;
+    }
+
   private:
 
     void expand_world()
