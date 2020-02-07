@@ -18,8 +18,6 @@ enum state : std::uint8_t
     tail   = 3u,
 };
 
-
-
 struct chunk
 {
     static constexpr inline std::size_t width  = 8;
