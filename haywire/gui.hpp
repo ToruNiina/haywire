@@ -1,6 +1,9 @@
 #ifndef HAYWIRE_GUI_HPP
 #define HAYWIRE_GUI_HPP
 #include "world.hpp"
+#include <extlib/wad/wad/in_place.hpp>
+#include <extlib/wad/wad/interface.hpp>
+#include <extlib/wad/wad/default_archiver.hpp>
 #include <SDL.h>
 #include <stdexcept>
 #include <string>
@@ -264,9 +267,13 @@ struct window
                         if((event.key.keysym.mod & KMOD_CTRL) != 0 ||
                            (event.key.keysym.mod & 1024)      != 0) // Mac command-key
                         {
-                            std::ofstream out("haywire.toml");
-                            out << std::setw(160) << world_.into_toml();
-                            std::cerr << "status written into haywire.toml" << std::endl;
+                            wad::write_archiver sink;
+                            wad::save<wad::type::map>(sink, "world", world_);
+                            sink.dump("haywire.msg");
+                            std::cerr << "status written into haywire.msg" << std::endl;
+//                             std::ofstream out("haywire.toml");
+//                             out << std::setw(160) << world_.into_toml();
+//                             std::cerr << "status written into haywire.toml" << std::endl;
                         }
                         break;
                     }
@@ -282,6 +289,18 @@ struct window
     {
         this->world_ = world(toml::parse(fname));
         return;
+    }
+
+
+    template<typename Archiver>
+    bool save(Archiver& arc) const
+    {
+        return wad::save<wad::type::map>(arc, "world", world_);
+    }
+    template<typename Archiver>
+    bool load(Archiver& arc)
+    {
+        return wad::load<wad::type::map>(arc, "world", world_);
     }
 
   private:

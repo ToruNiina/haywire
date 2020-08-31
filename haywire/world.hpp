@@ -1,6 +1,11 @@
 #ifndef HAYWIRE_WORLD_HPP
 #define HAYWIRE_WORLD_HPP
 #include <extlib/toml11/toml.hpp>
+#include <extlib/wad/wad/archive.hpp>
+#include <extlib/wad/wad/interface.hpp>
+#include <extlib/wad/wad/vector.hpp>
+#include <extlib/wad/wad/array.hpp>
+#include <extlib/wad/wad/enum.hpp>
 #include <algorithm>
 #include <array>
 #include <vector>
@@ -31,6 +36,17 @@ struct chunk
     chunk(chunk&&)      noexcept = default;
     chunk& operator=(const chunk&) noexcept = default;
     chunk& operator=(chunk&&)      noexcept = default;
+
+    template<typename Archiver>
+    bool save(Archiver& arc) const
+    {
+        return wad::save<wad::type::map>(arc, "cells", cells);
+    }
+    template<typename Archiver>
+    bool load(Archiver& arc)
+    {
+        return wad::load<wad::type::map>(arc, "cells", cells);
+    }
 
     toml::array into_toml() const
     {
@@ -98,6 +114,24 @@ struct world
         return toml::value{
             {"width", width_}, {"height", height_}, {"chunks", std::move(tmp)}
         };
+    }
+
+    template<typename Archiver>
+    bool save(Archiver& arc) const
+    {
+         return wad::save<wad::type::map>(arc,
+                "width", width_, "height", height_, "chunks", chunks_);
+    }
+    template<typename Archiver>
+    bool load(Archiver& arc)
+    {
+        const auto result = wad::load<wad::type::map>(arc,
+                "width", width_, "height", height_, "chunks", chunks_);
+
+        width_chunk_  = width_  / chunk::width  + (width_  % chunk::width  != 0),
+        height_chunk_ = height_ / chunk::height + (height_ % chunk::height != 0),
+        chunks_buf_   = chunks_;
+        return result;
     }
 
     state& operator()(const std::int32_t x, const std::int32_t y) noexcept

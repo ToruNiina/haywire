@@ -1,5 +1,6 @@
 #include <haywire/world.hpp>
 #include <haywire/gui.hpp>
+#include <extlib/wad/wad/default_archiver.hpp>
 
 int main(int argc, char **argv)
 {
@@ -11,7 +12,19 @@ int main(int argc, char **argv)
 
     if(argc == 2)
     {
-        win.load_toml(argv[1]);
+        const std::string fname(argv[1]);
+        if(fname.substr(fname.size() - 5) == ".toml")
+        {
+            win.load_toml(argv[1]);
+        }
+        else if(fname.substr(fname.size() - 4) == ".msg")
+        {
+            wad::read_archiver src(fname);
+            if(!wad::load(src, win))
+            {
+                return 1;
+            }
+        }
     }
     while(win.update()) {}
 
