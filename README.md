@@ -16,7 +16,9 @@ $ ./haywire [saved_data.toml (optional)]
 
 ## Build
 
-It depends on [SDL2](https://www.libsdl.org/). It requires C++17 compatible compiler.
+It depends on [SDL2](https://www.libsdl.org/). Make sure that SDL2 is installed.
+
+It requires C++17 compatible compiler.
 
 ```console
 $ cmake ..
