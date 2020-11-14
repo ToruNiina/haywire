@@ -208,7 +208,18 @@ struct window
                     switch(std::as_const(world_)(x, y))
                     {
                         case state::vacuum: {world_(x, y) = state::wire;   break;}
-                        case state::wire:   {world_(x, y) = state::head;   break;}
+                        case state::wire:
+                        {
+                            if(event.button.clicks == 2)
+                            {
+                                world_(x, y) = state::vacuum;
+                            }
+                            else
+                            {
+                                world_(x, y) = state::head;
+                            }
+                            break;
+                        }
                         case state::head:   {world_(x, y) = state::tail;   break;}
                         case state::tail:   {world_(x, y) = state::vacuum; break;}
                     }
