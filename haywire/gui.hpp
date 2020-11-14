@@ -20,7 +20,7 @@ struct sdl_resource
     {
         if(SDL_Init(SDL_INIT_EVERYTHING) != 0)
         {
-            using std::literals::string_literals::operator""s;
+            using namespace std::literals::string_literals;
             throw std::runtime_error("Error while initializing SDL"s +
                                      SDL_GetError());
         }
